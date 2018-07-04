@@ -19,6 +19,8 @@ gpio_counter = -1
 object_id = "-1"
 object_tags = []
 objects_file = {}
+edit_allowed = True
+
 
 canvas_sizex = 240
 canvas_sizey = 320
@@ -44,12 +46,6 @@ pins = StringVar(root)
 pins.set(gpio_list[0])
 
 def add_wall():
-    '''
-    Add a line object with coords at centre of canvas
-    Keep track of line objects with wall_counter and total objects on canvas with object_counter
-    Wall ID is in form of 'w1' - w for wall
-                               - 1 for wall number
-    '''
     global object_counter
     global wall_counter
     global object_id
@@ -360,13 +356,17 @@ def motion(event):
     update_gui()
 
 def mouse_clicked(event):
+    global edit_allowed
     global object_id
     global object_tags
 
-    try:
-        object_id = list(layout.gettags(event.widget.find_withtag("current")))[0]
-    except (IndexError, AttributeError):
-        pass
+    if edit_allowed:
+        try:
+            object_id = list(layout.gettags(event.widget.find_withtag("current")))[0]
+        except (IndexError, AttributeError):
+            pass
+    else:
+            object_id = "-1"
 
     print()
     print("Mouse clicked:")
@@ -859,6 +859,8 @@ def update_gui():
                 layout.itemconfig(objects, fill="Cyan", outline="Cyan")
         '''
 
+
+
     objectcount_label.config(text="Objects: " + str(object_counter))
 
 def activate_object():
@@ -1122,6 +1124,32 @@ def save_file():
     with open(os.path.join(__location__, 'Objects.txt'), 'wb') as picklefile:
         pickle.dump(objects_file, picklefile)
 
+def edit_mode():
+    global edit_allowed
+    global object_id
+
+    if not edit_allowed:
+        edit_allowed = True
+        edit_button.config(fg="White", activeforeground = "White")
+        add_wall_button.config(state=NORMAL)
+        add_door_button.config(state=NORMAL)
+        add_window_button.config(state=NORMAL)
+        add_light_button.config(state=NORMAL)
+
+
+
+    else:
+        edit_allowed = False
+        object_id = "-1"
+        edit_button.config(fg="Cyan",activeforeground = "Cyan")
+        add_wall_button.config(state=DISABLED)
+        add_door_button.config(state=DISABLED)
+        add_window_button.config(state=DISABLED)
+        add_light_button.config(state=DISABLED)
+
+
+    update_gui()
+
 
 root.bind('<Motion>', motion)
 root.bind('<Button-1>', mouse_clicked)
@@ -1287,7 +1315,19 @@ pin_menu.config(bg="Black",
                 activebackground = "Black",
                 activeforeground = "Cyan",
                 font="Courier 8 bold")
-
+edit_button = Button(root,
+                    text="Edit Mode",
+                    width=8,
+                    command=edit_mode,
+                    bg="Black",
+                    fg="White",
+                    font="Courier 7 bold",
+                    relief="flat",
+                    bd=0,
+                    activebackground = "Black",
+                    activeforeground = "White")
+edit_button.place(x=0 * canvas_sizex + x_start + 0 * x_space + 5 ,
+                  y=0 * canvas_sizey + y_start + 0 * y_space + 5)
 xy_label = Label(root,
                  bg="Black",
                  fg="Cyan",
