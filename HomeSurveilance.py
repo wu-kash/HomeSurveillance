@@ -6,7 +6,10 @@ import sys
 import math
 import os
 import numpy as np
+import time
+import RPi.GPIO as GPIO
 
+GPIO.setmode(GPIO.BCM)
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
@@ -21,6 +24,38 @@ object_tags = []
 objects_file = {}
 edit_allowed = True
 
+gpio_list = ['None','GPIO2','GPIO3','GPIO4','GPIO5',
+             'GPIO6','GPIO7','GPIO8','GPIO12',
+             'GPIO13','GPIO14','GPIO15','GPIO16',
+             'GPIO17','GPIO18','GPIO19','GPIO20',
+             'GPIO21','GPIO22','GPIO23','GPIO24',
+             'GPIO25','GPIO26','GPIO27']
+
+
+
+def interupt(pin):
+
+    if GPIO.input(pin) == GPIO.HIGH:
+        activate_object(pin)
+    elif GPIO.input(pin) == GPIO.LOW:
+        activate_object(pin)
+
+
+def initialize_pins():
+    pin_num = 0
+
+    for objects in list(layout.find_all()):
+        tags = list(layout.gettags(objects))
+
+        try:
+            if 'GPIO' in tags[3] and ('dc' in tags[1] or 'lc' in tags[1] or 'vb' in tags[1]):
+                pin_num = tags[3][4:]
+                print("Setting pin " + str(tags[3]) + " as input pin for " + str(tags[1]))
+                GPIO.setup( int(pin_num), GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+                GPIO.add_event_detect(int(pin_num), GPIO.BOTH, callback = interupt, bouncetime = 300)
+                
+        except IndexError:
+            pass
 
 canvas_sizex = 240
 canvas_sizey = 320
@@ -35,12 +70,6 @@ layout = Canvas(root, width=canvas_sizex, height=canvas_sizey, bg="black")
 layout.place(x=0,
              y=0)
 
-gpio_list = ['GPIO2','GPIO3','GPIO4','GPIO5',
-             'GPIO6','GPIO7','GPIO8','GPIO12',
-             'GPIO13','GPIO14','GPIO15','GPIO16',
-             'GPIO17','GPIO18','GPIO19','GPIO20',
-             'GPIO21','GPIO22','GPIO23','GPIO24',
-             'GPIO25','GPIO26','GPIO27']
 
 pins = StringVar(root)
 pins.set(gpio_list[0])
@@ -165,7 +194,7 @@ def add_door():
     layout.create_line(doorc_coords,
                        fill="White",
                        width=2,
-                       tags=[door_id, door_idc, 'closed', gpio_list[gpio_counter], 'horizontal'])
+                       tags=[door_id, door_idc, 'closed', gpio_list[gpio_counter], 'horizontal', 'N/A'])
     layout.create_line(doorl_coords,
                        fill="White",
                        width=2,
@@ -244,7 +273,7 @@ def add_window():
     layout.create_line(windowb_coords,
                        fill="White",
                        width=1,
-                       tags=[window_id, window_idb, 'closed', gpio_list[gpio_counter], 'horizontal'])
+                       tags=[window_id, window_idb, 'closed', gpio_list[gpio_counter], 'horizontal', 'N/A'])
     layout.create_line(windowt_coords,
                        fill="White",
                        width=1,
@@ -312,7 +341,7 @@ def add_light():
                        outline="Cyan",
                        fill="Black",
                        width=1,
-                       tags=[light_id, light_idc, 'off', gpio_list[gpio_counter]])
+                       tags=[light_id, light_idc, 'off', gpio_list[gpio_counter], 'N/A'])
 
     object_id = light_id
     print()
@@ -608,7 +637,7 @@ def rotate_object():
 
     if "w" in str(object_id):
         object_position = list(layout.coords(object_id))
-        object_tags = list(layout.gettags(object_id))
+        #object_tags = list(layout.gettags(object_id))
 
         layout.coords(object_id, rotate_line(object_position))
 
@@ -639,11 +668,19 @@ def rotate_object():
         cen_coords = list(layout.coords(centre_piece))
 
         if (object_tags[4] == 'horizontal'):
+
+            layout.dtag(object_id, object_tags[5])
             layout.dtag(object_id, 'horizontal')
             layout.addtag_withtag('vertical', object_id)
+            layout.addtag_withtag(object_tags[5], object_id)
+            
         elif (object_tags[4] == 'vertical'):
+            
+            layout.dtag(object_id, object_tags[5])
             layout.dtag(object_id, 'vertical')
             layout.addtag_withtag('horizontal', object_id)
+            layout.addtag_withtag(object_tags[5], object_id)
+            
 
         if (object_tags[4] == 'vertical'):
             side_len = np.abs(left_coords[3] - left_coords[1])
@@ -696,11 +733,18 @@ def rotate_object():
         cen_coords = list(layout.coords(centre_piece))
 
         if (object_tags[4] == 'horizontal'):
+
+            layout.dtag(object_id, object_tags[5])
             layout.dtag(object_id, 'horizontal')
             layout.addtag_withtag('vertical', object_id)
+            layout.addtag_withtag(object_tags[5], object_id)
+
         elif (object_tags[4] == 'vertical'):
+
+            layout.dtag(object_id, object_tags[5])
             layout.dtag(object_id, 'vertical')
             layout.addtag_withtag('horizontal', object_id)
+            layout.addtag_withtag(object_tags[5], object_id)
 
         if (object_tags[4] == 'vertical'):
             side_len = np.abs(left_coords[3] - left_coords[1])
@@ -823,15 +867,24 @@ def update_gui():
     global object_counter
     global object_tags
 
+    object_tags = list(layout.gettags(object_id))
 
     if object_id == "-1":
         objectid_label.config(text="ID: None")
     else:
         if 'w' in object_id:
+            print("update walls")
             objectid_label.config(text="ID: " + str(object_id))
-        else:
+            objectactivity_label.config(text = "Last activity: N/A")
+        elif 'l' in object_id:
+            print("update lights")
             objectid_label.config(text="ID: " + str(object_id) + ' - ' + str(object_tags[2]) + " (" +  str(object_tags[3]) + ")")
-
+            objectactivity_label.config(text = "Last activity: " + str(object_tags[4]))    
+        else:
+            print("update doors and windows")
+            print(object_tags)
+            objectid_label.config(text="ID: " + str(object_id) + ' - ' + str(object_tags[2]) + " (" +  str(object_tags[3]) + ")")
+            objectactivity_label.config(text = "Last activity: " + str(object_tags[5]))
 
     ''' Selection Check '''
     for objects in list(layout.find_all()):
@@ -858,31 +911,39 @@ def update_gui():
             if list(layout.gettags(objects))[2] == 'on':
                 layout.itemconfig(objects, fill="Cyan", outline="Cyan")
         '''
-
-
-
+    
     objectcount_label.config(text="Objects: " + str(object_counter))
 
-def activate_object():
-    '''temporary to test, add object_id in args
-    '''
+
+def activate_object(pin_num):
     global object_id
-    global object_tags
+    object_time = time.localtime(time.time())
 
-    print()
-    print("Activating object:")
-    print("Object ID: " + str(object_id))
-    print("From: " + str(object_tags))
-
+    object_time = str(object_time[0]) + "/" + str(object_time[1]) + "/" + str(object_time[2]) + " " + str(object_time[3]) + ":" + str(object_time[4]) + ":" + str(object_time[5])
+    print(object_time)
+    gpio_num = "GPIO" + str(pin_num)
+    object_tags = list(layout.gettags(gpio_num))
+    object_id = object_tags[0]
+    
     coords = list(layout.coords(object_id))
     if "d" in object_id:
+        
+        layout.dtag(object_id, object_tags[5])
         layout.dtag(object_id, object_tags[4])
         layout.dtag(object_id, object_tags[3])
         layout.dtag(object_id, object_tags[2])
+        
+        object_tags[5] = object_time
+
+        print(layout.gettags(object_id))
+        
         if object_tags[2] == 'closed':
             layout.addtag_withtag('open', object_id)
             layout.addtag_withtag(object_tags[3], object_id)
             layout.addtag_withtag(object_tags[4], object_id)
+            layout.addtag_withtag(object_tags[5], object_id)
+
+            print(layout.gettags(object_id))
 
             if object_tags[4] == 'horizontal':
                 coords[2] = coords[2] - 5
@@ -897,6 +958,9 @@ def activate_object():
             layout.addtag_withtag('closed', object_id)
             layout.addtag_withtag(object_tags[3], object_id)
             layout.addtag_withtag(object_tags[4], object_id)
+            layout.addtag_withtag(object_tags[5], object_id)
+
+            print(layout.gettags(object_id))
 
             if object_tags[4] == 'horizontal':
                 coords[2] = coords[2] + 5
@@ -913,14 +977,18 @@ def activate_object():
         base_piece = list(layout.gettags(list(layout.find_withtag("vb" + str(window_num)))[0]))[1]
         top_piece = list(layout.gettags(list(layout.find_withtag("vt" + str(window_num)))[0]))[1]
 
+        layout.dtag(object_id, object_tags[5])
         layout.dtag(object_id, object_tags[4])
         layout.dtag(object_id, object_tags[3])
         layout.dtag(object_id, object_tags[2])
+
+        object_tags[5] = object_time
 
         if object_tags[2] == 'closed':
             layout.addtag_withtag('open', object_id)
             layout.addtag_withtag(object_tags[3], object_id)
             layout.addtag_withtag(object_tags[4], object_id)
+            layout.addtag_withtag(object_tags[5], object_id)
 
             if object_tags[4] == 'horizontal':
                 coords[2] = coords[2] - 15
@@ -939,6 +1007,7 @@ def activate_object():
             layout.addtag_withtag('closed', object_id)
             layout.addtag_withtag(object_tags[3], object_id)
             layout.addtag_withtag(object_tags[4], object_id)
+            layout.addtag_withtag(object_tags[5], object_id)
 
             if object_tags[4] == 'horizontal':
                 coords[2] = coords[2] + 15
@@ -954,41 +1023,77 @@ def activate_object():
                 layout.coords(top_piece, coords)
 
     if "l" in object_id:
+        
+        layout.dtag(object_id, object_tags[4])
         layout.dtag(object_id, object_tags[3])
         layout.dtag(object_id, object_tags[2])
+
+        object_tags[4] = object_time
+        
         if object_tags[2] == 'off':
             layout.addtag_withtag('on', object_id)
             layout.addtag_withtag(object_tags[3], object_id)
+            layout.addtag_withtag(object_tags[4], object_id)
         elif object_tags[2] == 'on':
             layout.addtag_withtag('off', object_id)
             layout.addtag_withtag(object_tags[3], object_id)
+            layout.addtag_withtag(object_tags[4], object_id)
 
     object_tags = list(layout.gettags(object_id))
+    object_id = object_tags[0]
+
     print("To: " + str(object_tags))
+
+    with open(os.path.join(__location__, 'LOGS.txt'), 'a') as file:
+        file.write(str(object_tags) + "\n")
+
+
+        
+    
     update_gui()
+    
+    
 
 def assign_object():
     global object_id
     global object_tags
 
-    pin = pins.get()
+    pin_num = pins.get()
+    previous_pin_num = object_tags[3]
 
-    print()
-    print("Assigning " + str(pin) + " to " + str(object_id))
-
-
-    if "d" or "v" in object_id:
+    if "d" in object_id or "v" in object_id:
+        layout.dtag(object_id, object_tags[5])
         layout.dtag(object_id, object_tags[4])
         layout.dtag(object_id, object_tags[3])
 
-        layout.addtag_withtag(pin, object_id)
+        layout.addtag_withtag(pin_num, object_id)
         layout.addtag_withtag(object_tags[4], object_id)
+        layout.addtag_withtag(object_tags[5], object_id)
 
     elif "l" in object_id:
-        p = p
-
+        layout.dtag(object_id, object_tags[4])
+        layout.dtag(object_id, object_tags[3])
+        layout.addtag_withtag(pin_num, object_id)
+        layout.addtag_withtag(object_tags[4], object_id)
+    
+   
     object_tags = list(layout.gettags(object_id))
     update_gui()
+
+    if pin_num != "None":
+        gpio_pin = int(pin_num[4:])
+        print()
+        print("Assigning " + str(pin_num) + " to " + object_id)
+        GPIO.setup( int(gpio_pin), GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+        GPIO.add_event_detect(gpio_pin, GPIO.BOTH, callback = interupt, bouncetime = 300)
+    elif pin_num == "None":
+        gpio_pin = int(previous_pin_num[4:])
+        print("pin num = none")
+        print()
+        print("Removing " + str(object_tags[3]) + " assigment from " + object_id)
+        GPIO.remove_event_detect(gpio_pin)
+    
+    
 
 def load_file():
     global objects_file
@@ -1081,6 +1186,17 @@ def load_file():
 
     object_counter = door_counter + wall_counter + window_counter + light_counter
 
+    for objects in list(layout.find_all()):
+        tags = list(layout.gettags(objects))
+        if 'dc' in tags[1] or 'vb' in tags[1] or 'lc' in tags[1]:
+            ob_id = tags[0]
+            pin_num = tags[3]
+            if pin_num != 'None':
+                gpio_pin = int(tags[3][4:])
+                GPIO.setup( gpio_pin, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+                GPIO.add_event_detect(gpio_pin, GPIO.BOTH, callback = interupt, bouncetime = 300)
+                print("Assigning " + str(pin_num) + " to " + tags[0])
+
     update_gui()
     print("Loaded")
 
@@ -1124,6 +1240,9 @@ def save_file():
     with open(os.path.join(__location__, 'Objects.txt'), 'wb') as picklefile:
         pickle.dump(objects_file, picklefile)
 
+    print()
+    print("Saved")
+
 def edit_mode():
     global edit_allowed
     global object_id
@@ -1135,7 +1254,9 @@ def edit_mode():
         add_door_button.config(state=NORMAL)
         add_window_button.config(state=NORMAL)
         add_light_button.config(state=NORMAL)
-
+        print()
+        print("Edit mode enabled")
+    
 
 
     else:
@@ -1146,10 +1267,16 @@ def edit_mode():
         add_door_button.config(state=DISABLED)
         add_window_button.config(state=DISABLED)
         add_light_button.config(state=DISABLED)
+        print()
+        print("Edit mode disabled")
+
 
 
     update_gui()
-
+    
+def quit_app(): 
+    GPIO.cleanup()    
+    root.destroy()
 
 root.bind('<Motion>', motion)
 root.bind('<Button-1>', mouse_clicked)
@@ -1281,17 +1408,7 @@ load_button = Button(root,
                      bd=3)
 load_button.place(x=0 * canvas_sizex + x_start + 2 * x_space,
                   y=1 * canvas_sizey + y_start + 1 * y_space)
-act_button = Button(root,
-                    text="Activate",
-                    width=8,
-                    command=activate_object,
-                    bg="Black",
-                    fg="Cyan",
-                    font="Courier 10 bold",
-                    relief="groove",
-                    bd=3)
-act_button.place(x=1 * canvas_sizex + x_start + 0 * x_space,
-                 y=0 * canvas_sizey + y_start + 4 * y_space)
+
 assign_button = Button(root,
                        text="Assign",
                        width=8,
@@ -1302,10 +1419,10 @@ assign_button = Button(root,
                        relief="groove",
                        bd=3)
 assign_button.place(x=1 * canvas_sizex + x_start + 0 * x_space,
-                    y=0 * canvas_sizey + y_start + 5* y_space)
+                    y=0 * canvas_sizey + y_start + 4* y_space)
 pin_menu = OptionMenu(root, pins, *gpio_list)
 pin_menu.place(x=1 * canvas_sizex + x_start + 0 * x_space ,
-               y=0 * canvas_sizey + y_start + 6 * y_space)
+               y=0 * canvas_sizey + y_start + 5 * y_space)
 pin_menu.config(bg="Black",
                 fg="Cyan",
                 width=5,
@@ -1328,25 +1445,44 @@ edit_button = Button(root,
                     activeforeground = "White")
 edit_button.place(x=0 * canvas_sizex + x_start + 0 * x_space + 5 ,
                   y=0 * canvas_sizey + y_start + 0 * y_space + 5)
+quit_button = Button(root,
+                     text="Exit",
+                     width=8,
+                     command=quit_app,
+                     bg="Black",
+                     fg="Cyan",
+                     font="Courier 10 bold",
+                       relief="groove",
+                       bd=3)
+quit_button.place(x=0 * canvas_sizex + x_start + 3 * x_space - 4,
+                    y=1 * canvas_sizey + y_start + 1* y_space)
+                     
 xy_label = Label(root,
                  bg="Black",
                  fg="Cyan",
-                 font="Courier 8 bold")
+                 font="Courier 7 bold")
 xy_label.place(x=180,
                y=300)
 objectcount_label = Label(root,
                           bg="Black",
                           fg="Cyan",
-                          font="Courier 8 bold",
+                          font="Courier 7 bold",
                           text="Objects: 0")
 objectcount_label.place(x=5,
                         y=300)
 objectid_label = Label(root,
                        bg="Black",
                        fg="Cyan",
-                       font="Courier 8 bold",
+                       font="Courier 7 bold",
                        text="ID: None")
 objectid_label.place(x=5,
-                     y=285)
+                     y=270)
+objectactivity_label = Label(root,
+                       bg="Black",
+                       fg="Cyan",
+                       font="Courier 7 bold",
+                       text="Last activity: N/A ")
+objectactivity_label.place(x=5,
+                            y =285)
 
 root.mainloop()
