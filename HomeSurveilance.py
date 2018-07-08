@@ -11,6 +11,7 @@ import RPi.GPIO as GPIO
 
 GPIO.setmode(GPIO.BCM)
 
+''' Path to where the Objects.txt, LOGS.txt and Homesurveilance.py files are located. '''
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 object_counter = 0
@@ -24,6 +25,7 @@ object_tags = []
 objects_file = {}
 edit_allowed = True
 
+''' Edit this list to use with other models of Raspberry PI '''
 gpio_list = ['None','GPIO2','GPIO3','GPIO4','GPIO5',
              'GPIO6','GPIO7','GPIO8','GPIO12',
              'GPIO13','GPIO14','GPIO15','GPIO16',
@@ -31,10 +33,10 @@ gpio_list = ['None','GPIO2','GPIO3','GPIO4','GPIO5',
              'GPIO21','GPIO22','GPIO23','GPIO24',
              'GPIO25','GPIO26','GPIO27']
 
-
-
 def interupt(pin):
-
+    ''' Function that interupts on falling and rising edges and deals with the object accordingly. '''
+    ''' Future edit note. Can remove this function and plug directly into activate_object(). '''
+    
     if GPIO.input(pin) == GPIO.HIGH:
         activate_object(pin)
     elif GPIO.input(pin) == GPIO.LOW:
@@ -42,6 +44,8 @@ def interupt(pin):
 
 
 def initialize_pins():
+    ''' Initializes each pin as an input with rising/falling interupts to an object that is selected. '''
+    
     pin_num = 0
 
     for objects in list(layout.find_all()):
@@ -57,6 +61,7 @@ def initialize_pins():
         except IndexError:
             pass
 
+''' Was meant to work with a 240x320 LCD display. Can adjust to any size desired. '''
 canvas_sizex = 240
 canvas_sizey = 320
 window_sizex = 320
@@ -70,16 +75,22 @@ layout = Canvas(root, width=canvas_sizex, height=canvas_sizey, bg="black")
 layout.place(x=0,
              y=0)
 
-
 pins = StringVar(root)
 pins.set(gpio_list[0])
 
 def add_wall():
+    ''' Wall ID is given as in object_tags - 'w1'                  [0]
+                                           - 'wc1'                 [1]
+                                           - 'horizontal/vertical' [2]
+    Use object_id to get tags of the objects
+    Similar format applies to door, window and light objects
+    ''' 
     global object_counter
     global wall_counter
     global object_id
     global object_tags
 
+    ''' Counters keep track of all current wall_objects and total objects on the layout. '''
     wall_counter = wall_counter + 1
     object_counter = object_counter + 1
     wall_list = []
@@ -88,6 +99,7 @@ def add_wall():
     x = 120
     y = 160
 
+    ''' Get all the current wall_objects on the layout '''
     for walls in list(layout.find_all()):
         if list(layout.gettags(walls))[1][0:2] == 'wc':
             wall_list.append(int(list(layout.gettags(walls))[1][2:]))
@@ -95,6 +107,7 @@ def add_wall():
     if len(wall_list) == 0:
         wall_counter = 1
 
+    ''' Check current wall_id's so that a new wall with a consecutive ID is created. Prevent gaps in the ID's '''
     for walls in sorted(wall_list):
         if exist_wall_counter == int(walls):
             #print("w" + str(exist_wall_counter) + " exist")
@@ -132,16 +145,20 @@ def add_wall():
 
 def add_door():
     '''
-    Add 3 line objects with coords at centre of canvas
-    Keep track of line objects with door_counter and total objects on canvas with object_counter
-    Door ID is in form of 'd1' - d for door
-                               - 1 for door number
-    3 parts to door, 2 side and 1 center piece to represent in tags
-            - l1
-            - c1
-            - r1
-    Has status aswell in tags, either closed/open
-    '''
+      Each door object has three components  to represent door on layout.
+      Main door ID is represented in object_tags - 'd1'                  [0]
+                                                 - 'dc1'                 [1]
+                                                 - 'open/closed'         [2]
+                                                 - 'pin assigned'        [3]
+                                                 - 'horizontal/vertical' [4]
+                                                 - 'time activated'      [5]
+      Sub components ID's (left piece)  - 'd1'  [0]
+                                        - 'dl1' [1]
+                          (right piece) - 'd1' [0]
+                                        - 'dr1' [1]
+    Use object_id to get tags of the objects
+    Similar format applies to window and light objects
+    ''' 
     global object_counter
     global door_counter
     global object_id
@@ -215,6 +232,22 @@ def add_door():
 
 
 def add_window():
+    '''
+      Each door object has four components  to represent window on layout.
+      Main window ID is represented in object_tags - 'v1'                  [0]
+                                                   - 'vb1'                 [1]
+                                                   - 'open/closed'         [2]
+                                                   - 'pin assigned'        [3]
+                                                   - 'horizontal/vertical' [4]
+                                                   - 'time activated'      [5]
+      Sub components ID's (left piece)  - 'v1'  [0]
+                                        - 'vl1' [1]
+                          (right piece) - 'v1' [0]
+                                        - 'vr1' [1]
+                          (top piece)   - 'v1' [0]
+                                        - 'vt1' [1]
+    Use object_id to get tags of the objects
+    ''' 
     global object_counter
     global window_counter
     global object_id
@@ -298,6 +331,15 @@ def add_window():
 
 
 def add_light():
+  '''
+      Each light object has one component  to represent light on layout.
+      Light ID is represented in object_tags - 'l1'                  [0]
+                                             - 'lc1'                 [1]
+                                             - 'off/on'              [2]
+                                             - 'pin assigned'        [3]
+                                             - 'time activated'      [4]
+    Use object_id to get tags of the objects
+    ''' 
     global object_counter
     global light_counter
     global object_id
@@ -354,6 +396,7 @@ def add_light():
 
 
 def delete_object():
+  ''' Straight forward function, gets id and removes from layout. '''
     global object_counter
     global object_id
     global gpio_counter
@@ -373,6 +416,7 @@ def delete_object():
 
 
 def motion(event):
+  ''' Get position of mouse on the layout '''
     global object_id
     global canvas_sizex
     global canvas_sizey
@@ -385,6 +429,7 @@ def motion(event):
     update_gui()
 
 def mouse_clicked(event):
+  ''' Checks whether mouse clicked was on top of an object on the layout and selects the object '''
     global edit_allowed
     global object_id
     global object_tags
